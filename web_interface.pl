@@ -1,6 +1,8 @@
 % ============================================================
 %  web_interface.pl
 %  Algorithm Selection Expert System
+%  CM2520 - Deductive Reasoning and Logic Programming
+%  Author: Fernando P S R
 %
 %  Run:  swipl -s web_interface.pl
 %  Open: http://localhost:8080/
@@ -272,6 +274,10 @@ result_page(Request) :-
         -> length(StableList, StableCount) ; StableCount = 0 ),
         all_inplace_algorithms(PT, InplaceList),
         length(InplaceList, InplaceCount),
+        % --- RECURSION: score_all + rank + filter + build comparison ---
+        rank_algorithms(PT, DS, Mem, Pri, DO, Ranked),
+        filter_by_score(Ranked, 5, TopCandidates),
+        build_comparison(TopCandidates, 5, CompList),
         fmt_atom(Algo, AlgoDisplay),
         fmt_atom(PT,   PTDisplay),
         fmt_atom(DS,   DSDisplay),
@@ -320,6 +326,8 @@ result_page(Request) :-
                     p(AvoidMsg)
                 ]),
                 \render_alternative(PT, AltAlgo),
+                % Ranked comparison table — built by recursive build_comparison/3
+                \render_comparison_table(CompList, Algo),
                 div([class('form-actions')], [
                     a([href('/select'),  class('btn-primary')],   'Try Another'),
                     a([href('/history'), class('btn-secondary')], 'View History'),
@@ -356,6 +364,46 @@ render_alternative(PT, AltAlgo) -->
         p(AltDesc),
         a([href(Link), class('btn-outline')], 'View details')
     ])).
+
+
+% ============================================================
+%  COMPARISON TABLE
+%  Renders the ranked list built by recursive build_comparison/3.
+%  Each row highlights the recommended algorithm.
+% ============================================================
+
+render_comparison_table([], _) --> [].
+render_comparison_table(CompList, Recommended) -->
+    html(div([class('info-card')], [
+        h3([class('info-title')], 'Ranked comparison for this category'),
+        p([style('font-size:0.82rem;color:#888;margin-bottom:0.8rem;')],
+          'Scored recursively by the expert system based on your constraints. Higher score = better fit.'),
+        table([class('comp-table')], [
+            thead(tr([th('Algorithm'), th('Time'), th('Space'), th('Stable'), th('Fit')])),
+            tbody(\comp_rows(CompList, Recommended))
+        ])
+    ])).
+
+comp_rows([], _) --> [].
+comp_rows([algo(Name, Time, Space, Stab)|Rest], Recommended) -->
+    {
+        fmt_atom(Name, NameDisplay),
+        ( Name = Recommended ->
+            RowClass = 'comp-row comp-best'
+        ;   RowClass = 'comp-row' )
+    },
+    html(tr([class(RowClass)], [
+        td([class('comp-name')], [
+            NameDisplay,
+            ( Name = Recommended ->
+                span([class('best-badge')], 'recommended')
+            ; '' )
+        ]),
+        td([class('comp-time')],  Time),
+        td([class('comp-space')], Space),
+        td([class('comp-stab')],  Stab)
+    ])),
+    comp_rows(Rest, Recommended).
 
 all_inplace_algorithms(Category, InplaceList) :-
     findall(Name-Category,
@@ -885,6 +933,18 @@ page_style -->
         .empty-state { text-align:center; padding:50px 0; color:#888; }
         .empty-state p { font-size:1.1rem; margin-bottom:1rem; }
         h2 { text-align:center; }
+
+        .comp-table { width:100%; border-collapse:collapse; font-size:0.87rem; margin-top:0.4rem; }
+        .comp-table th { background:#1a237e; color:#fff; padding:8px 12px; text-align:left; font-weight:normal; }
+        .comp-table td { padding:8px 12px; border-bottom:1px solid #f0f0f0; }
+        .comp-row:hover { background:#f5f5f5; }
+        .comp-best { background:#e8f5e9 !important; }
+        .comp-best:hover { background:#c8e6c9 !important; }
+        .comp-name { font-weight:bold; text-transform:capitalize; color:#1a237e; }
+        .comp-time  { font-family:monospace; color:#0d47a1; }
+        .comp-space { font-family:monospace; color:#1b5e20; }
+        .comp-stab  { text-transform:capitalize; color:#6a1b9a; }
+        .best-badge { background:#43a047; color:#fff; font-size:0.7rem; padding:1px 7px; border-radius:10px; margin-left:7px; font-weight:bold; vertical-align:middle; }
 
         @media(max-width:700px) {
             .complexity-grid,.insight-row { grid-template-columns:1fr 1fr; }

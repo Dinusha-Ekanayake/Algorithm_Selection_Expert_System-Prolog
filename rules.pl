@@ -214,34 +214,28 @@ alternative(string_matching, z_algorithm, kmp).
 % ============================================================
 
 % all_in_category(+Category, -List)
-% Collects all algorithm names in a given category using findall.
 all_in_category(Category, List) :-
     findall(Name, algorithm(Name, Category, _, _, _, _), List).
 
 % algorithm_exists(+Name)
-% Checks if an algorithm is in the knowledge base.
 algorithm_exists(Name) :-
     algorithm(Name, _, _, _, _, _).
 
 % category_exists(+Category)
-% Succeeds if at least one algorithm exists in the given category.
 category_exists(Category) :-
     algorithm(_, Category, _, _, _, _), !.
 
 % count_in_category(+Category, -Count)
-% Counts how many algorithms exist in a given category.
 count_in_category(Category, Count) :-
     findall(_, algorithm(_, Category, _, _, _, _), List),
     length(List, Count).
 
 % all_categories(-Categories)
-% Returns a sorted, deduplicated list of all categories.
 all_categories(Categories) :-
     findall(C, algorithm(_, C, _, _, _, _), Raw),
     sort(Raw, Categories).
 
 % stable_algorithms_in(+Category, -List)
-% Returns only stable algorithms in a category using member/2 + findall.
 stable_algorithms_in(Category, List) :-
     findall(Name,
         ( algorithm(Name, Category, _, _, Stab, _),
@@ -249,8 +243,6 @@ stable_algorithms_in(Category, List) :-
         List).
 
 % fast_algorithms(+Category, -List)
-% Returns algorithms whose time complexity does NOT contain n^2.
-% Uses \+ (negation-as-failure) as a filter.
 fast_algorithms(Category, List) :-
     findall(Name,
         ( algorithm(Name, Category, Time, _, _, _),
@@ -258,8 +250,126 @@ fast_algorithms(Category, List) :-
         List).
 
 % inplace_algorithms(+Category, -List)
-% Returns algorithms with O(1) space complexity.
 inplace_algorithms(Category, List) :-
     findall(Name,
         algorithm(Name, Category, _, 'O(1)', _, _),
         List).
+
+
+% ============================================================
+%  SCORING: how well does an algorithm match the constraints?
+%  score_algorithm(+Algo, +DS, +Mem, +Pri, +DO, -Score)
+%
+%  Each matched constraint adds points.
+%  Used by rank_algorithms to sort candidates.
+% ============================================================
+
+score_algorithm(Algo, DS, Mem, Pri, DO, Score) :-
+    algorithm(Algo, _, _, Space, Stab, _),
+    % +30 if this is the primary recommendation
+    ( recommend(_, DS, Mem, Pri, DO, Algo) -> P1 = 30 ; P1 = 0 ),
+    % +20 if algorithm is stable and stability is the priority
+    ( Pri = stability, Stab = stable     -> P2 = 20 ; P2 = 0 ),
+    % +15 if algorithm is in-place and memory is tight
+    ( Mem = low,  member(Space, ['O(1)', 'O(log n)']) -> P3 = 15 ; P3 = 0 ),
+    % +10 if data order matches a known preference
+    ( member(DO, [nearly_sorted, integer_small_range, float_uniform,
+                  unweighted, weighted_negative, knapsack, lcs, lis,
+                  multi_pattern, single_pattern]) -> P4 = 10 ; P4 = 0 ),
+    % +5 if data size is large (rewards scalable algorithms)
+    ( DS = large -> P5 = 5 ; P5 = 0 ),
+    Score is P1 + P2 + P3 + P4 + P5.
+
+
+% ============================================================
+%  RECURSION 1: rank_algorithms/5
+%
+%  Recursively scores every algorithm in a category and
+%  builds a list of Score-Name pairs, then sorts descending.
+%
+%  rank_algorithms(+Category, +DS, +Mem, +Pri, +DO, -Ranked)
+%  Ranked = list of (Score-AlgoName) sorted best first.
+% ============================================================
+
+rank_algorithms(Category, DS, Mem, Pri, DO, Ranked) :-
+    all_in_category(Category, Algos),
+    score_all(Algos, DS, Mem, Pri, DO, Scored),
+    msort(Scored, Ascending),
+    reverse(Ascending, Ranked).
+
+% score_all/6 — recursive base case: empty list
+score_all([], _, _, _, _, []).
+
+% score_all/6 — recursive step: score head, recurse on tail
+score_all([Algo|Rest], DS, Mem, Pri, DO, [Score-Algo|ScoredRest]) :-
+    score_algorithm(Algo, DS, Mem, Pri, DO, Score),
+    score_all(Rest, DS, Mem, Pri, DO, ScoredRest).
+
+
+% ============================================================
+%  RECURSION 2: collect_warnings/3
+%
+%  Recursively walks a list of algorithms and collects
+%  avoid_when/2 warnings for each one into a flat list.
+%
+%  collect_warnings(+AlgoList, -Warnings)
+%  Warnings = list of AlgoName-WarningMessage pairs.
+% ============================================================
+
+% Base case: empty list → no warnings
+collect_warnings([], []).
+
+% Step: if avoid_when exists for head, prepend it, then recurse
+collect_warnings([Algo|Rest], [Algo-Warning|MoreWarnings]) :-
+    avoid_when(Algo, Warning), !,
+    collect_warnings(Rest, MoreWarnings).
+
+% Step: no warning for this algorithm, just recurse
+collect_warnings([_|Rest], Warnings) :-
+    collect_warnings(Rest, Warnings).
+
+
+% ============================================================
+%  RECURSION 3: filter_by_score/4
+%
+%  Recursively filters a scored list keeping only entries
+%  whose score is at or above a given threshold.
+%
+%  filter_by_score(+ScoredList, +Threshold, -Filtered)
+% ============================================================
+
+% Base case
+filter_by_score([], _, []).
+
+% Keep head if score >= threshold, recurse on tail
+filter_by_score([Score-Algo|Rest], Threshold, [Score-Algo|Kept]) :-
+    Score >= Threshold, !,
+    filter_by_score(Rest, Threshold, Kept).
+
+% Skip head if below threshold, recurse on tail
+filter_by_score([_|Rest], Threshold, Kept) :-
+    filter_by_score(Rest, Threshold, Kept).
+
+
+% ============================================================
+%  RECURSION 4: build_comparison/3
+%
+%  Recursively builds a comparison list of
+%  algo(Name, Time, Space, Stab) terms from a scored list.
+%  Used to render the comparison table on the result page.
+%
+%  build_comparison(+ScoredList, +Max, -CompList)
+%  Max = max number of entries to include (limits table rows)
+% ============================================================
+
+% Base case: max reached
+build_comparison(_, 0, []) :- !.
+
+% Base case: empty list
+build_comparison([], _, []).
+
+% Step: fetch algorithm details, recurse on rest
+build_comparison([_Score-Algo|Rest], Max, [algo(Algo,Time,Space,Stab)|More]) :-
+    algorithm(Algo, _, Time, Space, Stab, _),
+    Next is Max - 1,
+    build_comparison(Rest, Next, More).
