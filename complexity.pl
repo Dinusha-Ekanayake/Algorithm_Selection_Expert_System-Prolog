@@ -1,8 +1,6 @@
 % ============================================================
 %  complexity.pl
 %  Algorithm Selection Expert System
-%  CM2520 - Deductive Reasoning and Logic Programming
-%  Author: Fernando P S R
 %
 %  Supplementary facts: real-world use cases and warning
 %  conditions for every algorithm in the knowledge base.
