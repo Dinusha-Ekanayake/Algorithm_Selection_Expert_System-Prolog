@@ -1,8 +1,6 @@
 % ============================================================
 %  query_log.pl
 %  Algorithm Selection Expert System
-%  CM2520 - Deductive Reasoning and Logic Programming
-%  Author: Fernando P S R
 %
 %  Dynamic knowledge base: stores the history of all
 %  queries and all runtime-added algorithms.

@@ -1,8 +1,6 @@
 % ============================================================
 %  web_interface.pl
 %  Algorithm Selection Expert System
-%  CM2520 - Deductive Reasoning and Logic Programming
-%  Author: Fernando P S R
 %
 %  Run:  swipl -s web_interface.pl
 %  Open: http://localhost:8080/
