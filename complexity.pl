@@ -1,15 +1,25 @@
 % ============================================================
 %  complexity.pl
 %  Algorithm Selection Expert System
+%  CM2520 - Deductive Reasoning and Logic Programming
+%  Author: Fernando P S R
 %
-%  Supplementary facts: real-world use cases, warning
-%  conditions (when to avoid), and comparison pairs.
-%  These enrich the explanation engine beyond just rules.
+%  Supplementary facts: real-world use cases and warning
+%  conditions for every algorithm in the knowledge base.
+%  These are loaded by web_interface.pl at startup and
+%  used on the result page to explain the recommendation.
 % ============================================================
+
+% Declare discontiguous so use_case/2 and avoid_when/2 facts
+% can be defined in separate sections without SWI-Prolog warnings.
+:- discontiguous use_case/2.
+:- discontiguous avoid_when/2.
+
 
 % ============================================================
 %  USE CASES
-%  use_case(+AlgorithmName, -UseCase)
+%  use_case(+AlgorithmName, -Description)
+%  Maps each algorithm to its real-world applications.
 % ============================================================
 
 use_case(bubble_sort,     'Teaching sorting concepts; detecting one swap needed in a nearly sorted list.').
@@ -57,6 +67,7 @@ use_case(z_algorithm,  'Efficient pattern matching; widely used in competitive p
 % ============================================================
 %  AVOID CONDITIONS
 %  avoid_when(+AlgorithmName, -Reason)
+%  Encodes conditions under which an algorithm should NOT be used.
 % ============================================================
 
 avoid_when(bubble_sort,    'Data is large - O(n^2) becomes impractically slow beyond a few thousand elements.').
