@@ -1,15 +1,16 @@
 # Algorithm Selection Expert System (Prolog-based Web Application)
 
-This is a web-based Algorithm Selection Expert System developed using SWI-Prolog. It uses a rule-based expert system to recommend the most suitable algorithm for a given problem, based on problem type, data size, memory constraints, and priorities.
+This is a web-based Algorithm Selection Expert System developed using SWI-Prolog. It uses a rule-based expert system to recommend the most suitable algorithm for a given problem based on problem type, data size, memory constraints, and priorities — with full dynamic knowledge base management.
 
 ## 🔧 Features
 
-- 🧠 **Intelligent Algorithm Recommendation**: Describe your problem and constraints — the system reasons through Prolog rules to recommend the best algorithm.
-- 📊 **Complexity Analysis**: Every recommendation includes time complexity, space complexity, and stability classification.
-- 💡 **Detailed Explanations**: Understand *why* the algorithm was chosen, its real-world use cases, and when to avoid it.
-- 🔄 **Alternative Suggestions**: The system always suggests an alternative algorithm to consider.
-- 📚 **Browse All Algorithms**: Explore all 36 algorithms in the knowledge base, filterable by category.
-- 📜 **Query History**: All past queries are stored at runtime using a dynamic knowledge base (`assertz/1`).
+- 🧠 **Intelligent Recommendation**: The Prolog expert system reasons through rules to recommend the best algorithm for your constraints.
+- 📊 **Complexity Analysis**: Every recommendation includes time complexity, space complexity, and stability.
+- 💡 **Rich Explanations**: Understand why the algorithm was chosen, its real-world use cases, and when to avoid it.
+- 🔄 **Alternative Suggestions**: The system always recommends an alternative algorithm.
+- 🗄️ **Dynamic Knowledge Base**: Add or remove algorithms at runtime using `assertz/1` and `retract/1` through the Manage KB page.
+- 📚 **Browse All Algorithms**: Explore all algorithms filterable by category.
+- 📜 **Query History**: All queries are stored dynamically using `assertz/1` and grouped using `bagof/3`.
 
 ---
 
@@ -17,48 +18,66 @@ This is a web-based Algorithm Selection Expert System developed using SWI-Prolog
 
 | File | Description |
 |---|---|
-| `web_interface.pl` | Main file — starts the HTTP server and contains all page handlers |
-| `algorithms.pl` | Knowledge base — 36 algorithms with time/space complexity and descriptions |
-| `rules.pl` | Recommendation rules — Prolog rules mapping constraints to algorithms |
-| `complexity.pl` | Use cases and avoid-when facts for each algorithm |
-| `query_log.pl` | Dynamic knowledge base — stores query history at runtime |
+| `web_interface.pl` | Main file — HTTP server, all page handlers, dynamic KB management |
+| `algorithms.pl` | Knowledge base — 36 algorithms declared with `:- dynamic algorithm/6` |
+| `rules.pl` | Recommendation rules + helpers using `findall/3`, `bagof/3`, `member/2`, `forall/2` |
+| `complexity.pl` | `use_case/2` and `avoid_when/2` facts for every algorithm |
+| `query_log.pl` | Dynamic declarations: `query_log/7` and `custom_algorithm/6` |
 
 ---
 
-## 🧠 Problem Categories & Algorithms Covered
+## ✅ CM2520 Requirements Coverage
 
-| Category | Algorithms |
+| Requirement | How it is met |
 |---|---|
-| **Sorting** | Bubble, Selection, Insertion, Merge, Quick, Heap, Counting, Radix, Tim, Shell, Bucket |
-| **Searching** | Linear, Binary, Jump, Interpolation, Exponential, Ternary |
-| **Graph** | BFS, DFS, Dijkstra, Bellman-Ford, A\*, Floyd-Warshall, Kruskal, Prim, Topological Sort |
-| **Dynamic Programming** | Memoization, Tabulation, Knapsack DP, LCS DP, LIS DP |
-| **String Matching** | Naive, KMP, Rabin-Karp, Boyer-Moore, Z-Algorithm |
+| **Facts & Rules** | `algorithm/6` facts in `algorithms.pl`; `recommend/6` rules in `rules.pl` with cuts (`!`) and conditionals (`-> ;`) |
+| **Dynamic KB** | `assertz/1` adds custom algorithms and logs queries; `retract/1` removes custom algorithms; `retractall/1` clears history |
+| **Web Interface** | SWI-Prolog HTTP server serving 5 pages; Manage KB page for runtime add/remove |
+| **findall/3** | Used in `result_page` to count algorithms per category; in `browse_page` to collect all matching algorithms |
+| **bagof/3** | Used in `all_stable_algorithms/1` and `history_page` to group queries by problem type |
+| **member/2** | Used in `all_inplace_algorithms/1` to filter algorithms by space complexity from a list |
+| **forall/2** | Used in `all_exist/1` to verify every algorithm in a list exists in the KB |
+| **\+ (negation)** | Used in `add_algorithm/6` to prevent duplicate entries; in `rules.pl` for constraint filtering |
+| **Backtracking** | Rules use multiple clauses — Prolog backtracks through `recommend/6` clauses until a match is found |
 
 ---
 
-## 🔬 How the Rules Work
+## 🧠 Algorithms in the Knowledge Base
 
-The expert system fires rules based on five inputs:
+| Category | Count | Examples |
+|---|---|---|
+| Sorting | 11 | Bubble, Merge, Quick, Heap, Tim, Counting, Radix... |
+| Searching | 6 | Binary, Linear, Jump, Interpolation, Exponential... |
+| Graph | 9 | BFS, DFS, Dijkstra, A\*, Bellman-Ford, Kruskal... |
+| Dynamic Programming | 5 | Memoization, Tabulation, Knapsack DP, LCS, LIS |
+| String Matching | 5 | KMP, Boyer-Moore, Rabin-Karp, Z-Algorithm, Naive |
 
-| Input | Options |
-|---|---|
-| Problem Type | sorting, searching, graph, dynamic_programming, string_matching |
-| Data Size | small, medium, large |
-| Memory | low, moderate, high |
-| Priority | speed, stability, simplicity, memory |
-| Data Characteristics | random, nearly_sorted, sorted, unweighted, weighted_positive, knapsack, ... |
+---
 
-**Example rule:**
+## 🔬 Example Prolog Rules
+
 ```prolog
-% Need stability + large data → merge sort
-recommend(sorting, large, _, stability, _, merge_sort) :- !.
+% Negative weights — only Bellman-Ford is correct
+recommend(graph, _, _, _, weighted_negative, bellman_ford) :- !.
 
-% Memory is tight → heap sort (in-place, O(n log n))
+% Memory tight — heap sort is the only O(1) space O(n log n) sort
 recommend(sorting, _, low, _, _, heap_sort) :- !.
 
-% Shortest path with negative weights → Bellman-Ford
-recommend(graph, _, _, _, weighted_negative, bellman_ford) :- !.
+% Collect all algorithms in a category using findall/3
+all_in_category(Category, List) :-
+    findall(Name, algorithm(Name, Category, _, _, _, _), List).
+
+% Group stable algorithms using bagof/3
+all_stable_algorithms(StableList) :-
+    bagof(Name-Cat,
+          Time^Space^Desc^algorithm(Name, Cat, Time, Space, stable, Desc),
+          StableList).
+
+% Add algorithm to live KB using assertz/1
+add_algorithm(Name, Cat, Time, Space, Stab, Desc) :-
+    \+ algorithm(Name, _, _, _, _, _),
+    assertz(algorithm(Name, Cat, Time, Space, Stab, Desc)),
+    assertz(custom_algorithm(Name, Cat, Time, Space, Stab, Desc)).
 ```
 
 ---
@@ -90,5 +109,6 @@ recommend(graph, _, _, _, weighted_negative, bellman_ford) :- !.
 ## 🤖 UI
 
 ![Homepage Screenshot](screenshots/1.png)
-![Select Problem Screenshot](screenshots/2.png)
+![Find Algorithm Screenshot](screenshots/2.png)
 ![Result Screenshot](screenshots/3.png)
+![Manage Knowledge Base Screenshot](screenshots/4.png)

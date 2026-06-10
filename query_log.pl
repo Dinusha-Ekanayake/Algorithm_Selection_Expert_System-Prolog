@@ -5,10 +5,16 @@
 %  Author: Fernando P S R
 %
 %  Dynamic knowledge base: stores the history of all
-%  queries made during the session using assertz/1.
+%  queries and all runtime-added algorithms.
 %
-%  Format: query_log(ID, ProblemType, DataSize,
-%                    Memory, Priority, DataOrder, Result)
+%  query_log(ID, ProblemType, DataSize, Memory,
+%            Priority, DataOrder, RecommendedAlgorithm)
+%
+%  custom_algorithm(Name, Category, TimeComplexity,
+%                   SpaceComplexity, Stable, Description)
+%  Tracks which algorithms were added by the user at runtime
+%  so they can be individually removed.
 % ============================================================
 
 :- dynamic query_log/7.
+:- dynamic custom_algorithm/6.
