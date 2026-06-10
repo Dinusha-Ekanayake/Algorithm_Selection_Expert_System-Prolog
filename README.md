@@ -26,7 +26,7 @@ This is a web-based Algorithm Selection Expert System developed using SWI-Prolog
 
 ---
 
-## ✅ CM2520 Requirements Coverage
+## ✅ Requirements Coverage
 
 | Requirement | How it is met |
 |---|---|

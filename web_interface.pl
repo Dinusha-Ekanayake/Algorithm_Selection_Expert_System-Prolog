@@ -1,27 +1,15 @@
 % ============================================================
 %  web_interface.pl
 %  Algorithm Selection Expert System
-%  CM2520 - Deductive Reasoning and Logic Programming
-%  Author: Fernando P S R
 %
-%  SWI-Prolog HTTP web server.
 %  Run:  swipl -s web_interface.pl
 %  Open: http://localhost:8080/
-%
-%  Demonstrates:
-%   - Facts & Rules        : algorithms.pl, rules.pl, complexity.pl
-%   - Dynamic KB           : assertz/retract for adding/removing algorithms
-%                            and logging queries at runtime
-%   - Built-in Prolog Logic: findall/3, bagof/3, member/2, fail/0,
-%                            forall/2, \+, ->/;, !, aggregate_all/3
-%   - Web Interface        : 5 pages served over HTTP
 % ============================================================
 
 :- use_module(library(http/thread_httpd)).
 :- use_module(library(http/http_dispatch)).
 :- use_module(library(http/http_parameters)).
 :- use_module(library(http/html_write)).
-:- use_module(library(http/http_redirect)).
 
 :- [algorithms].
 :- [rules].
@@ -36,15 +24,15 @@
 %  HTTP ROUTES
 % ============================================================
 
-:- http_handler(root(.),        home_page,       []).
-:- http_handler(root(select),   select_page,     []).
-:- http_handler(root(result),   result_page,     []).
-:- http_handler(root(browse),   browse_page,     []).
-:- http_handler(root(history),  history_page,    []).
-:- http_handler(root(manage),   manage_page,     []).
-:- http_handler(root(add_algo), add_algo_handler,[]).
-:- http_handler(root(del_algo), del_algo_handler,[]).
-:- http_handler(root(clear),    clear_page,      []).
+:- http_handler(root(.),        home_page,        []).
+:- http_handler(root(select),   select_page,      []).
+:- http_handler(root(result),   result_page,      []).
+:- http_handler(root(browse),   browse_page,      []).
+:- http_handler(root(history),  history_page,     []).
+:- http_handler(root(manage),   manage_page,      []).
+:- http_handler(root(add_algo), add_algo_handler, []).
+:- http_handler(root(del_algo), del_algo_handler, []).
+:- http_handler(root(clear),    clear_page,       []).
 
 start_server(Port) :-
     http_server(http_dispatch, [port(Port)]).
@@ -52,7 +40,6 @@ start_server(Port) :-
 
 % ============================================================
 %  DYNAMIC KB HELPERS
-%  Uses assertz/1, retract/1, findall/3, aggregate_all/3
 % ============================================================
 
 next_query_id(ID) :-
@@ -62,14 +49,11 @@ next_query_id(ID) :-
 save_query(ID, PT, DS, Mem, Pri, DO, Algo) :-
     assertz(query_log(ID, PT, DS, Mem, Pri, DO, Algo)).
 
-% Add a new algorithm to the dynamic knowledge base at runtime.
-% Uses assertz/1 to add both algorithm/6 and custom_algorithm/6.
 add_algorithm(Name, Cat, Time, Space, Stab, Desc) :-
-    \+ algorithm(Name, _, _, _, _, _),      % prevent duplicates
+    \+ algorithm(Name, _, _, _, _, _),
     assertz(algorithm(Name, Cat, Time, Space, Stab, Desc)),
     assertz(custom_algorithm(Name, Cat, Time, Space, Stab, Desc)).
 
-% Remove a custom (user-added) algorithm using retract/1.
 remove_algorithm(Name) :-
     custom_algorithm(Name, Cat, Time, Space, Stab, Desc),
     retract(algorithm(Name, Cat, Time, Space, Stab, Desc)),
@@ -78,13 +62,10 @@ remove_algorithm(Name) :-
 clear_history :-
     retractall(query_log(_, _, _, _, _, _, _)).
 
-% Count how many custom algorithms have been added this session.
 custom_count(N) :-
     findall(_, custom_algorithm(_, _, _, _, _, _), L),
     length(L, N).
 
-% Collect algorithm stats per category using bagof/3.
-% bagof groups solutions by category — demonstrates required Prolog.
 category_stats(StatsList) :-
     findall(Cat, algorithm(_, Cat, _, _, _, _), AllCats),
     sort(AllCats, Cats),
@@ -94,33 +75,28 @@ category_stats(StatsList) :-
           length(Algos, Count) ),
         StatsList).
 
-% Collect all stable algorithms using bagof/3.
-% bagof(X, Goal, Bag) — groups all X satisfying Goal.
 all_stable_algorithms(StableList) :-
     ( bagof(Name-Cat,
             Time^Space^Desc^algorithm(Name, Cat, Time, Space, stable, Desc),
             StableList)
-    -> true
-    ;  StableList = [] ).
+    -> true ; StableList = [] ).
 
-% Collect all O(1) space algorithms using findall + member.
 all_inplace_algorithms(InplaceList) :-
     findall(Name-Cat,
         ( algorithm(Name, Cat, _, Space, _, _),
           member(Space, ['O(1)', 'O(log n)']) ),
         InplaceList).
 
-% Verify every algorithm in a list exists using forall/2.
-all_exist(AlgoList) :-
-    forall(member(A, AlgoList), algorithm(A, _, _, _, _, _)).
-
-% Collect all custom algorithms added this session.
 list_custom_algorithms(List) :-
     findall(row(N,C,T,S,St,D), custom_algorithm(N,C,T,S,St,D), List).
 
-% Check if an algorithm name atom is already taken.
 name_taken(Name) :-
     algorithm(Name, _, _, _, _, _), !.
+
+fmt_atom(Atom, Display) :-
+    atom_string(Atom, Str),
+    split_string(Str, "_", "", Parts),
+    atomic_list_concat(Parts, ' ', Display).
 
 
 % ============================================================
@@ -139,11 +115,11 @@ home_page(_Request) :-
         \navbar(home),
         div([class('hero')], [
             h1('Algorithm Selection Expert System'),
-            p([class('subtitle')], 'CM2520 \u00b7 Deductive Reasoning and Logic Programming'),
+            p([class('subtitle')], 'CM2520 - Deductive Reasoning and Logic Programming'),
             div([class('hero-body')], [
                 p('Describe your problem constraints and let the Prolog expert system reason through the knowledge base to recommend the best algorithm.'),
                 p('The system covers sorting, searching, graph algorithms, dynamic programming, and string matching.'),
-                p('You can also extend the knowledge base at runtime by adding your own custom algorithms.')
+                p('Extend the knowledge base at runtime by adding your own custom algorithms via the Manage KB page.')
             ]),
             div([class('hero-btns')], [
                 a([href('/select'),  class('btn-primary')],   'Find an Algorithm'),
@@ -151,12 +127,11 @@ home_page(_Request) :-
                 a([href('/manage'),  class('btn-outline')],   'Manage Knowledge Base')
             ])
         ]),
-        % Live stats row using findall results
         div([class('stats-row')], [
-            div([class('stat-card')], [span([class('stat-num')], TotalAlgos),  span([class('stat-lbl')], 'Algorithms in KB')]),
-            div([class('stat-card')], [span([class('stat-num')], TotalQueries),span([class('stat-lbl')], 'Queries Made')]),
-            div([class('stat-card')], [span([class('stat-num')], CustomCount), span([class('stat-lbl')], 'Custom Added')]),
-            div([class('stat-card')], [span([class('stat-num')], '5'),         span([class('stat-lbl')], 'Categories')])
+            div([class('stat-card')], [span([class('stat-num')], TotalAlgos),   span([class('stat-lbl')], 'Algorithms in KB')]),
+            div([class('stat-card')], [span([class('stat-num')], TotalQueries), span([class('stat-lbl')], 'Queries Made')]),
+            div([class('stat-card')], [span([class('stat-num')], CustomCount),  span([class('stat-lbl')], 'Custom Added')]),
+            div([class('stat-card')], [span([class('stat-num')], '5'),          span([class('stat-lbl')], 'Categories')])
         ]),
         div([class('categories-section')], [
             h2('Problem Categories'),
@@ -166,11 +141,7 @@ home_page(_Request) :-
 
 render_cat_cards([]) --> [].
 render_cat_cards([Cat-Count|Rest]) -->
-    {
-        atom_string(Cat, CStr),
-        split_string(CStr, "_", "", Parts),
-        atomic_list_concat(Parts, ' ', CatDisplay)
-    },
+    { fmt_atom(Cat, CatDisplay) },
     html(div([class('cat-card')], [
         h3(CatDisplay),
         span([class('cat-count')], [Count, ' algorithms'])
@@ -179,7 +150,7 @@ render_cat_cards([Cat-Count|Rest]) -->
 
 
 % ============================================================
-%  PAGE: SELECT (problem input form)
+%  PAGE: SELECT
 % ============================================================
 
 select_page(_Request) :-
@@ -188,7 +159,7 @@ select_page(_Request) :-
         \navbar(select),
         div([class('form-container')], [
             h2('Describe Your Problem'),
-            p([class('form-intro')], 'Select your constraints below. The expert system will fire matching Prolog rules and recommend the best algorithm.'),
+            p([class('form-intro')], 'Select your constraints. The expert system will fire matching Prolog rules and recommend the best algorithm.'),
             form([action('/result'), method('GET'), class('select-form')], [
 
                 div([class('form-section')], [
@@ -242,9 +213,9 @@ select_page(_Request) :-
                         \radio_card(data_order, float_uniform,      'Float Uniform',      'Floats uniformly distributed'),
                         \radio_card(data_order, unweighted,         'Unweighted Graph',   'All edges equal weight'),
                         \radio_card(data_order, weighted_positive,  'Weighted Positive',  'Non-negative edge weights'),
-                        \radio_card(data_order, weighted_negative,  'Has Negative Weights','Graph has negative weights'),
+                        \radio_card(data_order, weighted_negative,  'Has Negative Weights','Graph may have negative weights'),
                         \radio_card(data_order, heuristic,          'Heuristic Available','You have a distance estimate'),
-                        \radio_card(data_order, all_pairs,          'All-Pairs Shortest', 'Need shortest path between all nodes'),
+                        \radio_card(data_order, all_pairs,          'All-Pairs Shortest', 'Shortest path between all nodes'),
                         \radio_card(data_order, cycle_detection,    'Cycle Detection',    'Need to detect cycles'),
                         \radio_card(data_order, topological,        'Topological Order',  'DAG with dependency ordering'),
                         \radio_card(data_order, sparse_mst,         'Sparse MST',         'Minimum spanning tree, sparse graph'),
@@ -261,7 +232,7 @@ select_page(_Request) :-
                 ]),
 
                 div([class('form-actions')], [
-                    input([type(submit), value('Find Best Algorithm \u2192'), class('btn-primary')])
+                    input([type(submit), value('Find Best Algorithm'), class('btn-primary')])
                 ])
             ])
         ])
@@ -278,7 +249,6 @@ radio_card(Name, Value, Label, Desc) -->
 
 % ============================================================
 %  PAGE: RESULT
-%  Uses: recommend/6, findall/3, bagof/3, member/2
 % ============================================================
 
 result_page(Request) :-
@@ -290,40 +260,72 @@ result_page(Request) :-
         data_order(DO,    [atom, default(random)])
     ]),
     ( recommend(PT, DS, Mem, Pri, DO, Algo) ->
-        % --- Save to dynamic KB using assertz ---
         next_query_id(ID),
         save_query(ID, PT, DS, Mem, Pri, DO, Algo),
-
-        % --- Fetch algorithm details ---
         algorithm(Algo, _, Time, Space, Stability, Desc),
-
-        % --- Fetch use case and warning ---
-        ( use_case(Algo, UseCase)    -> true ; UseCase    = 'No use case recorded.' ),
-        ( avoid_when(Algo, AvoidMsg) -> true ; AvoidMsg   = 'No specific warnings.' ),
-
-        % --- Find alternative using rules ---
+        ( use_case(Algo, UseCase)    -> true ; UseCase  = 'No use case recorded.' ),
+        ( avoid_when(Algo, AvoidMsg) -> true ; AvoidMsg = 'No specific warnings.' ),
         ( alternative(PT, Algo, AltAlgo) -> true ; AltAlgo = none ),
-
-        % --- Collect all algorithms in same category using findall ---
         findall(N, algorithm(N, PT, _, _, _, _), AllInCat),
         length(AllInCat, CatCount),
-
-        % --- Collect stable algorithms in category using bagof ---
         ( bagof(N, T^S^D^algorithm(N, PT, T, S, stable, D), StableList)
-        -> length(StableList, StableCount)
-        ;  StableCount = 0 ),
-
-        % --- Collect in-place algorithms using member + findall ---
-        inplace_algorithms(PT, InplaceList),
+        -> length(StableList, StableCount) ; StableCount = 0 ),
+        all_inplace_algorithms(PT, InplaceList),
         length(InplaceList, InplaceCount),
-
+        fmt_atom(Algo, AlgoDisplay),
+        fmt_atom(PT,   PTDisplay),
+        fmt_atom(DS,   DSDisplay),
+        fmt_atom(Mem,  MemDisplay),
+        fmt_atom(Pri,  PriDisplay),
+        fmt_atom(DO,   DODisplay),
         reply_html_page(title('Recommendation'), [
             \page_style,
             \navbar(select),
-            \result_view(PT, DS, Mem, Pri, DO, Algo,
-                         Time, Space, Stability, Desc,
-                         UseCase, AvoidMsg, AltAlgo,
-                         CatCount, StableCount, InplaceCount)
+            div([class('result-container')], [
+                h2('Algorithm Recommendation'),
+                div([class('rec-banner')], [
+                    div([class('rec-algo-name')], AlgoDisplay),
+                    div([class('rec-tagline')], 'Recommended by the Prolog expert system')
+                ]),
+                div([class('input-summary')], [
+                    h3([class('summary-label')], 'Your selections:'),
+                    div([class('tag-row')], [
+                        span([class('tag tag-type')],  ['Problem: ',  PTDisplay]),
+                        span([class('tag tag-size')],  ['Size: ',     DSDisplay]),
+                        span([class('tag tag-mem')],   ['Memory: ',   MemDisplay]),
+                        span([class('tag tag-pri')],   ['Priority: ', PriDisplay]),
+                        span([class('tag tag-data')],  ['Data: ',     DODisplay])
+                    ])
+                ]),
+                div([class('complexity-grid')], [
+                    div([class('cx-card')], [span([class('cx-label')], 'Time Complexity'),  span([class('cx-val cx-time')],  Time)]),
+                    div([class('cx-card')], [span([class('cx-label')], 'Space Complexity'), span([class('cx-val cx-space')], Space)]),
+                    div([class('cx-card')], [span([class('cx-label')], 'Stability'),        span([class('cx-val cx-stab')],  Stability)])
+                ]),
+                div([class('insight-row')], [
+                    div([class('insight-card')], [span([class('ins-num')], CatCount),    span([class('ins-lbl')], 'algorithms in this category')]),
+                    div([class('insight-card')], [span([class('ins-num')], StableCount), span([class('ins-lbl')], 'stable options available')]),
+                    div([class('insight-card')], [span([class('ins-num')], InplaceCount),span([class('ins-lbl')], 'in-place options available')])
+                ]),
+                div([class('info-card')], [
+                    h3([class('info-title')], 'Why this algorithm?'),
+                    p(Desc)
+                ]),
+                div([class('info-card info-use')], [
+                    h3([class('info-title')], 'Real-world use cases'),
+                    p(UseCase)
+                ]),
+                div([class('info-card info-warn')], [
+                    h3([class('info-title')], 'When to avoid'),
+                    p(AvoidMsg)
+                ]),
+                \render_alternative(PT, AltAlgo),
+                div([class('form-actions')], [
+                    a([href('/select'),  class('btn-primary')],   'Try Another'),
+                    a([href('/history'), class('btn-secondary')], 'View History'),
+                    a([href('/browse'),  class('btn-outline')],   'Browse All Algorithms')
+                ])
+            ])
         ])
     ;
         reply_html_page(title('No Match'), [
@@ -333,94 +335,9 @@ result_page(Request) :-
                 h2('No Exact Match Found'),
                 div([class('no-match-box')], [
                     p('The expert system could not match your exact constraint combination.'),
-                    p('Please go back and try adjusting your selections.'),
-                    a([href('/select'), class('btn-primary')], '\u2190 Try Again')
+                    p('Please go back and adjust your selections.'),
+                    a([href('/select'), class('btn-primary')], 'Try Again')
                 ])
-            ])
-        ])
-    ).
-
-result_view(PT, DS, Mem, Pri, DO, Algo,
-            Time, Space, Stability, Desc,
-            UseCase, AvoidMsg, AltAlgo,
-            CatCount, StableCount, InplaceCount) -->
-    {
-        fmt_atom(Algo, AlgoDisplay),
-        fmt_atom(PT,   PTDisplay),
-        fmt_atom(DS,   DSDisplay),
-        fmt_atom(Mem,  MemDisplay),
-        fmt_atom(Pri,  PriDisplay),
-        fmt_atom(DO,   DODisplay)
-    },
-    html(
-        div([class('result-container')], [
-            h2('Algorithm Recommendation'),
-
-            div([class('rec-banner')], [
-                div([class('rec-algo-name')], AlgoDisplay),
-                div([class('rec-tagline')], 'Recommended by the Prolog expert system')
-            ]),
-
-            % Input summary tags
-            div([class('input-summary')], [
-                h3([class('summary-label')], 'Your selections:'),
-                div([class('tag-row')], [
-                    span([class('tag tag-type')],  ['Problem: ',  PTDisplay]),
-                    span([class('tag tag-size')],  ['Size: ',     DSDisplay]),
-                    span([class('tag tag-mem')],   ['Memory: ',   MemDisplay]),
-                    span([class('tag tag-pri')],   ['Priority: ', PriDisplay]),
-                    span([class('tag tag-data')],  ['Data: ',     DODisplay])
-                ])
-            ]),
-
-            % Complexity cards
-            div([class('complexity-grid')], [
-                div([class('cx-card')], [span([class('cx-label')], 'Time Complexity'),  span([class('cx-val cx-time')],  Time)]),
-                div([class('cx-card')], [span([class('cx-label')], 'Space Complexity'), span([class('cx-val cx-space')], Space)]),
-                div([class('cx-card')], [span([class('cx-label')], 'Stability'),        span([class('cx-val cx-stab')],  Stability)])
-            ]),
-
-            % Category insight row — from findall + bagof results
-            div([class('insight-row')], [
-                div([class('insight-card')], [
-                    span([class('ins-num')], CatCount),
-                    span([class('ins-lbl')], 'algorithms in this category')
-                ]),
-                div([class('insight-card')], [
-                    span([class('ins-num')], StableCount),
-                    span([class('ins-lbl')], 'stable options available')
-                ]),
-                div([class('insight-card')], [
-                    span([class('ins-num')], InplaceCount),
-                    span([class('ins-lbl')], 'in-place options available')
-                ])
-            ]),
-
-            % Why this algorithm
-            div([class('info-card')], [
-                h3([class('info-title')], '\u2713 Why this algorithm?'),
-                p(Desc)
-            ]),
-
-            % Use case
-            div([class('info-card info-use')], [
-                h3([class('info-title')], '\ud83c\udf0d Real-world use cases'),
-                p(UseCase)
-            ]),
-
-            % Warning
-            div([class('info-card info-warn')], [
-                h3([class('info-title')], '\u26a0 When to avoid'),
-                p(AvoidMsg)
-            ]),
-
-            % Alternative
-            \render_alternative(PT, AltAlgo),
-
-            div([class('form-actions')], [
-                a([href('/select'),  class('btn-primary')],   '\u2190 Try Another'),
-                a([href('/history'), class('btn-secondary')], 'View History'),
-                a([href('/browse'),  class('btn-outline')],   'Browse All Algorithms')
             ])
         ])
     ).
@@ -433,23 +350,27 @@ render_alternative(PT, AltAlgo) -->
         format(atom(Link), '/browse?category=~w&highlight=~w', [PT, AltAlgo])
     },
     html(div([class('info-card info-alt')], [
-        h3([class('info-title')], '\ud83d\udd04 Alternative to consider'),
+        h3([class('info-title')], 'Alternative to consider'),
         div([class('alt-name')], AltDisplay),
-        p(['Time: ', AltTime, ' \u00b7 Space: ', AltSpace]),
+        p(['Time: ', AltTime, ' / Space: ', AltSpace]),
         p(AltDesc),
-        a([href(Link), class('btn-outline')], 'View in browser')
+        a([href(Link), class('btn-outline')], 'View details')
     ])).
+
+all_inplace_algorithms(Category, InplaceList) :-
+    findall(Name-Category,
+        ( algorithm(Name, Category, _, Space, _, _),
+          member(Space, ['O(1)', 'O(log n)']) ),
+        InplaceList).
 
 
 % ============================================================
-%  PAGE: MANAGE KNOWLEDGE BASE (Dynamic KB)
-%  Uses: assertz, retract, findall, member, \+
+%  PAGE: MANAGE KNOWLEDGE BASE
 % ============================================================
 
 manage_page(Request) :-
     ( member(method(post), Request) ->
         http_parameters(Request, [
-            action(Action,   [default("add")]),
             name(NameStr,    [default("")]),
             category(CatStr, [default("")]),
             time(TimeStr,    [default("")]),
@@ -457,38 +378,23 @@ manage_page(Request) :-
             stable(StabStr,  [default("stable")]),
             desc(DescStr,    [default("")])
         ]),
-        ( Action = "add" ->
-            ( NameStr = "" ; CatStr = "" ; TimeStr = "" ;
-              SpaceStr = "" ; DescStr = "" ) ->
-                manage_page_with_msg(Request, "error",
-                    "All fields are required.", true)
+        ( NameStr = "" ; CatStr = "" ; TimeStr = "" ; SpaceStr = "" ; DescStr = "" ) ->
+            render_manage_page("error", "All fields are required.")
+        ;
+            atom_string(NameAtom, NameStr),
+            atom_string(CatAtom,  CatStr),
+            atom_string(StabAtom, StabStr),
+            ( name_taken(NameAtom) ->
+                render_manage_page("error", "An algorithm with that name already exists.")
             ;
-                atom_string(NameAtom, NameStr),
-                atom_string(CatAtom,  CatStr),
-                atom_string(StabAtom, StabStr),
-                ( name_taken(NameAtom) ->
-                    manage_page_with_msg(Request, "error",
-                        "An algorithm with that name already exists.", true)
-                ;
-                    add_algorithm(NameAtom, CatAtom, TimeStr, SpaceStr, StabAtom, DescStr),
-                    manage_page_with_msg(Request, "success",
-                        "Algorithm added to the knowledge base.", false)
-                )
-        ;   % action = remove handled via GET
-            manage_page_render("", false)
-        )
+                add_algorithm(NameAtom, CatAtom, TimeStr, SpaceStr, StabAtom, DescStr),
+                render_manage_page("success", "Algorithm added to the knowledge base.")
+            )
     ;
-        manage_page_render("", false)
+        render_manage_page("", "")
     ).
 
-manage_page_with_msg(_Request, MsgType, Msg, KeepForm) :-
-    ( KeepForm = true -> ShowForm = true ; ShowForm = false ),
-    manage_page_html(MsgType, Msg, ShowForm).
-
-manage_page_render(_, _) :-
-    manage_page_html("", "", false).
-
-manage_page_html(MsgType, Msg, _ShowForm) :-
+render_manage_page(MsgType, Msg) :-
     list_custom_algorithms(CustomList),
     length(CustomList, CustomCount),
     findall(_, algorithm(_, _, _, _, _, _), AllA),
@@ -500,41 +406,29 @@ manage_page_html(MsgType, Msg, _ShowForm) :-
             h2('Manage Knowledge Base'),
             p([class('form-intro')],
               'Add or remove algorithms from the knowledge base at runtime using assertz/1 and retract/1.'),
-
-            % Status message
             \render_msg(MsgType, Msg),
-
-            % Stats
             div([class('kb-stats')], [
-                div([class('kb-stat')], [
-                    span([class('kb-num')], TotalCount),
-                    span([class('kb-lbl')], 'total algorithms')
-                ]),
-                div([class('kb-stat')], [
-                    span([class('kb-num')], CustomCount),
-                    span([class('kb-lbl')], 'added this session')
-                ])
+                div([class('kb-stat')], [span([class('kb-num')], TotalCount),  span([class('kb-lbl')], 'total algorithms')]),
+                div([class('kb-stat')], [span([class('kb-num')], CustomCount), span([class('kb-lbl')], 'added this session')])
             ]),
-
-            % Add algorithm form
             div([class('add-form-wrap')], [
                 h3('Add a New Algorithm'),
-                p([class('add-note')], 'This uses assertz/1 to add the algorithm to the live knowledge base.'),
-                form([action('/add_algo'), method('POST'), class('add-form')], [
+                p([class('add-note')], 'Uses assertz/1 to insert the algorithm into the live knowledge base immediately.'),
+                form([action('/manage'), method('POST'), class('add-form')], [
                     div([class('field-grid')], [
                         div([class('field-group')], [
-                            label('Algorithm Name (atom):'),
+                            label('Algorithm Name:'),
                             input([name(name), placeholder('e.g. my_sort'), class('field-input')])
                         ]),
                         div([class('field-group')], [
                             label('Category:'),
                             select([name(category), class('field-input')], [
-                                option([value(sorting)],            'Sorting'),
-                                option([value(searching)],          'Searching'),
-                                option([value(graph)],              'Graph'),
-                                option([value(dynamic_programming)],'Dynamic Programming'),
-                                option([value(string_matching)],    'String Matching'),
-                                option([value(other)],              'Other')
+                                option([value(sorting)],             'Sorting'),
+                                option([value(searching)],           'Searching'),
+                                option([value(graph)],               'Graph'),
+                                option([value(dynamic_programming)], 'Dynamic Programming'),
+                                option([value(string_matching)],     'String Matching'),
+                                option([value(other)],               'Other')
                             ])
                         ]),
                         div([class('field-group')], [
@@ -564,23 +458,19 @@ manage_page_html(MsgType, Msg, _ShowForm) :-
                     ])
                 ])
             ]),
-
-            % Custom algorithms table
             h3([style('margin-top:2rem; color:#1a237e;')], 'Custom Algorithms (Added This Session)'),
             \render_custom_table(CustomList)
         ])
     ]).
 
-render_msg("", _)    --> [].
+render_msg("", _) --> [].
 render_msg("success", Msg) -->
-    html(div([class('msg msg-success')], ['\u2713 ', Msg])).
+    html(div([class('msg msg-success')], Msg)).
 render_msg("error", Msg) -->
-    html(div([class('msg msg-error')], ['\u26a0 ', Msg])).
+    html(div([class('msg msg-error')], Msg)).
 
 render_custom_table([]) -->
-    html(div([class('empty-state')], [
-        p('No custom algorithms added yet this session.')
-    ])).
+    html(div([class('empty-state')], [p('No custom algorithms added yet this session.')])).
 render_custom_table(List) -->
     html(table([class('history-table')], [
         thead(tr([th('Name'), th('Category'), th('Time'), th('Space'), th('Stable'), th('Remove')])),
@@ -599,14 +489,13 @@ render_custom_rows([row(N,C,T,S,St,_)|Rest]) -->
         td([class('td-type')], CD),
         td(T), td(S), td(St),
         td(a([href(DelLink), class('btn-danger'),
-              onclick('return confirm("Remove this algorithm?");')],
-             'Remove'))
+              onclick('return confirm("Remove this algorithm?");')], 'Remove'))
     ])),
     render_custom_rows(Rest).
 
 
 % ============================================================
-%  HANDLERS: ADD / REMOVE ALGORITHM
+%  HANDLERS: ADD / REMOVE
 % ============================================================
 
 add_algo_handler(Request) :-
@@ -619,35 +508,33 @@ add_algo_handler(Request) :-
         stable(StabStr,  [default("stable")]),
         desc(DescStr,    [default("")])
     ]),
-    (   NameStr \= "", CatStr \= "", TimeStr \= "",
-        SpaceStr \= "", DescStr \= ""
-    ->
+    ( NameStr \= "", CatStr \= "", TimeStr \= "", SpaceStr \= "", DescStr \= "" ->
         atom_string(NameAtom, NameStr),
         atom_string(CatAtom,  CatStr),
         atom_string(StabAtom, StabStr),
         ( name_taken(NameAtom) ->
             reply_html_page(title('Error'), [
                 \page_style, \navbar(manage),
-                \alert_script('An algorithm with that name already exists!'),
-                \redirect_script('/manage')
+                \alert_then_redirect('That algorithm name already exists!', '/manage')
             ])
         ;
             add_algorithm(NameAtom, CatAtom, TimeStr, SpaceStr, StabAtom, DescStr),
             reply_html_page(title('Added'), [
                 \page_style, \navbar(manage),
-                \alert_script('Algorithm added to the knowledge base!'),
-                \redirect_script('/manage')
+                \alert_then_redirect('Algorithm added successfully!', '/manage')
             ])
         )
     ;
         reply_html_page(title('Error'), [
             \page_style, \navbar(manage),
-            \alert_script('Please fill in all fields.'),
-            \redirect_script('/manage')
+            \alert_then_redirect('Please fill in all fields.', '/manage')
         ])
     ).
-add_algo_handler(Request) :-
-    http_redirect(see_other, '/manage', Request).
+add_algo_handler(_Request) :-
+    reply_html_page(title('Error'), [
+        \page_style, \navbar(manage),
+        \alert_then_redirect('Invalid request.', '/manage')
+    ]).
 
 del_algo_handler(Request) :-
     http_parameters(Request, [name(NameStr, [default("")])]),
@@ -657,24 +544,24 @@ del_algo_handler(Request) :-
             remove_algorithm(NameAtom),
             reply_html_page(title('Removed'), [
                 \page_style, \navbar(manage),
-                \alert_script('Algorithm removed from the knowledge base.'),
-                \redirect_script('/manage')
+                \alert_then_redirect('Algorithm removed.', '/manage')
             ])
         ;
             reply_html_page(title('Error'), [
                 \page_style, \navbar(manage),
-                \alert_script('Only custom algorithms can be removed.'),
-                \redirect_script('/manage')
+                \alert_then_redirect('Only custom algorithms can be removed.', '/manage')
             ])
         )
     ;
-        http_redirect(see_other, '/manage', Request)
+        reply_html_page(title('Error'), [
+            \page_style, \navbar(manage),
+            \alert_then_redirect('No name given.', '/manage')
+        ])
     ).
 
 
 % ============================================================
-%  PAGE: BROWSE ALL ALGORITHMS
-%  Uses: findall/3, member/2, \+
+%  PAGE: BROWSE
 % ============================================================
 
 browse_page(Request) :-
@@ -697,7 +584,7 @@ browse_page(Request) :-
             div([class('browse-header')], [
                 h2('All Algorithms'),
                 p([class('browse-sub')],
-                  ['Showing ', Count, ' algorithms \u00b7 ',
+                  ['Showing ', Count, ' algorithms | ',
                    StableCount, ' stable total in knowledge base']),
                 div([class('filter-row')], [
                     \filter_link(all,                'All',                Cat),
@@ -752,14 +639,12 @@ custom_badge(false) --> [].
 
 % ============================================================
 %  PAGE: HISTORY
-%  Uses: findall/3, bagof/3 for grouped stats
 % ============================================================
 
 history_page(_Request) :-
     findall(row(ID,PT,DS,Mem,Pri,DO,Algo),
             query_log(ID, PT, DS, Mem, Pri, DO, Algo), Rows),
     length(Rows, Total),
-    % Use bagof to group queries by problem type — demonstrates bagof
     ( bagof(PT, ID^DS^Mem^Pri^DO^Algo^query_log(ID,PT,DS,Mem,Pri,DO,Algo), PTList)
     -> sort(PTList, UniqTypes), length(UniqTypes, TypeCount)
     ;  TypeCount = 0 ),
@@ -771,9 +656,8 @@ history_page(_Request) :-
                 h2('Query History'),
                 ( Total > 0 ->
                     a([href('/clear'), class('btn-danger'),
-                       onclick('return confirm("Clear all history?");')],
-                      'Clear All')
-                ;   span('') )
+                       onclick('return confirm("Clear all history?");')], 'Clear All')
+                ; span('') )
             ]),
             div([class('history-stats')], [
                 span([class('hs-item')], [Total, ' total queries']),
@@ -805,26 +689,23 @@ history_rows([row(ID,PT,DS,Mem,Pri,DO,Algo)|Rest]) -->
     },
     html(tr([
         td(ID),
-        td([class('td-type')],  PTD),
-        td(DSD),
-        td(Mem),
-        td(Pri),
-        td([class('td-char')],  DOD),
+        td([class('td-type')], PTD),
+        td(DSD), td(Mem), td(Pri),
+        td([class('td-char')], DOD),
         td(span([class('algo-badge')], AD))
     ])),
     history_rows(Rest).
 
 
 % ============================================================
-%  PAGE: CLEAR HISTORY
+%  PAGE: CLEAR
 % ============================================================
 
 clear_page(_Request) :-
     clear_history,
     reply_html_page(title('Cleared'), [
         \page_style, \navbar(history),
-        \alert_script('History cleared!'),
-        \redirect_script('/history')
+        \alert_then_redirect('History cleared!', '/history')
     ]).
 
 
@@ -832,30 +713,23 @@ clear_page(_Request) :-
 %  SHARED COMPONENTS
 % ============================================================
 
-alert_script(Message) -->
-    html(script(type('text/javascript'), ['alert("', Message, '");'])).
-
-redirect_script(URL) -->
-    html(script(type('text/javascript'), ['window.location.href = "', URL, '";'])).
+alert_then_redirect(Message, URL) -->
+    html(script(type('text/javascript'), [
+        'alert("', Message, '"); window.location.href = "', URL, '";'
+    ])).
 
 navbar(Active) -->
     html(nav([class('navbar')], [
-        \nav_link('/',        'Home',                Active, home),
-        \nav_link('/select',  'Find Algorithm',      Active, select),
-        \nav_link('/browse',  'Browse All',          Active, browse),
-        \nav_link('/manage',  'Manage KB',           Active, manage),
-        \nav_link('/history', 'History',             Active, history)
+        \nav_link('/',        'Home',           Active, home),
+        \nav_link('/select',  'Find Algorithm', Active, select),
+        \nav_link('/browse',  'Browse All',     Active, browse),
+        \nav_link('/manage',  'Manage KB',      Active, manage),
+        \nav_link('/history', 'History',        Active, history)
     ])).
 
 nav_link(Href, Label, Active, Key) -->
     { ( Active = Key -> Class = 'nav-btn active' ; Class = 'nav-btn' ) },
     html(a([href(Href), class(Class)], Label)).
-
-% Helper: convert atom to display string (underscores → spaces, capitalize)
-fmt_atom(Atom, Display) :-
-    atom_string(Atom, Str),
-    split_string(Str, "_", "", Parts),
-    atomic_list_concat(Parts, ' ', Display).
 
 
 % ============================================================
@@ -883,7 +757,7 @@ page_style -->
 
         .hero { text-align:center; padding:52px 24px 36px; max-width:860px; margin:0 auto; }
         .hero h1 { font-size:2.1rem; color:#1a237e; margin-bottom:0.4rem; }
-        .subtitle { color:#2196f3; font-size:0.9rem; margin-bottom:1.3rem; font-weight:bold; }
+        .subtitle { color:#2196f3; font-size:0.9rem; margin-bottom:1.3rem; font-weight:bold; display:block; }
         .hero-body p { font-size:1rem; color:#003366; font-weight:bold; margin-bottom:0.5rem; }
         .hero-btns   { margin-top:1.4rem; }
 
@@ -1010,7 +884,6 @@ page_style -->
 
         .empty-state { text-align:center; padding:50px 0; color:#888; }
         .empty-state p { font-size:1.1rem; margin-bottom:1rem; }
-
         h2 { text-align:center; }
 
         @media(max-width:700px) {

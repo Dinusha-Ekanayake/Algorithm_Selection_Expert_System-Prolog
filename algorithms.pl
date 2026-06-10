@@ -1,8 +1,6 @@
 % ============================================================
 %  algorithms.pl
 %  Algorithm Selection Expert System
-%  CM2520 - Deductive Reasoning and Logic Programming
-%  Author: Fernando P S R
 %
 %  Knowledge base: built-in algorithm facts (static) +
 %  dynamic algorithm facts added at runtime.
