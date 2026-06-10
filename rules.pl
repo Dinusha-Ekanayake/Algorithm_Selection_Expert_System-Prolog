@@ -1,8 +1,6 @@
 % ============================================================
 %  rules.pl
 %  Algorithm Selection Expert System
-%  CM2520 - Deductive Reasoning and Logic Programming
-%  Author: Fernando P S R
 %
 %  Core recommendation rules using:
 %  - Cuts (!) for deterministic selection

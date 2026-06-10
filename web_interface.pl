@@ -1,8 +1,6 @@
 % ============================================================
 %  web_interface.pl
 %  Algorithm Selection Expert System
-%  CM2520 - Deductive Reasoning and Logic Programming
-%  Author: Fernando P S R
 %
 %  Run:  swipl -s web_interface.pl
 %  Open: http://localhost:8080/
@@ -387,18 +385,18 @@ render_comparison_table(CompList, Recommended) -->
 comp_rows([], _) --> [].
 comp_rows([algo(Name, Time, Space, Stab)|Rest], Recommended) -->
     {
-        fmt_atom(Name, NameDisplay),
+        ( atom(Name) -> fmt_atom(Name, NameDisplay) ; atom_string(Name, NameDisplay) ),
         ( Name = Recommended ->
-            RowClass = 'comp-row comp-best'
-        ;   RowClass = 'comp-row' )
+            RowClass = 'comp-row comp-best',
+            BadgeHTML = [span([class('best-badge')], 'recommended')]
+        ;
+            RowClass = 'comp-row',
+            BadgeHTML = []
+        ),
+        append([NameDisplay], BadgeHTML, NameCell)
     },
     html(tr([class(RowClass)], [
-        td([class('comp-name')], [
-            NameDisplay,
-            ( Name = Recommended ->
-                span([class('best-badge')], 'recommended')
-            ; '' )
-        ]),
+        td([class('comp-name')], NameCell),
         td([class('comp-time')],  Time),
         td([class('comp-space')], Space),
         td([class('comp-stab')],  Stab)
@@ -426,7 +424,7 @@ manage_page(Request) :-
             stable(StabStr,  [default("stable")]),
             desc(DescStr,    [default("")])
         ]),
-        ( NameStr = "" ; CatStr = "" ; TimeStr = "" ; SpaceStr = "" ; DescStr = "" ) ->
+        ( ( NameStr = "" ; CatStr = "" ; TimeStr = "" ; SpaceStr = "" ; DescStr = "" ) ->
             render_manage_page("error", "All fields are required.")
         ;
             atom_string(NameAtom, NameStr),
@@ -438,6 +436,7 @@ manage_page(Request) :-
                 add_algorithm(NameAtom, CatAtom, TimeStr, SpaceStr, StabAtom, DescStr),
                 render_manage_page("success", "Algorithm added to the knowledge base.")
             )
+        )
     ;
         render_manage_page("", "")
     ).
@@ -702,10 +701,7 @@ history_page(_Request) :-
         div([class('history-container')], [
             div([class('history-header')], [
                 h2('Query History'),
-                ( Total > 0 ->
-                    a([href('/clear'), class('btn-danger'),
-                       onclick('return confirm("Clear all history?");')], 'Clear All')
-                ; span('') )
+                \render_clear_btn(Total)
             ]),
             div([class('history-stats')], [
                 span([class('hs-item')], [Total, ' total queries']),
@@ -714,6 +710,12 @@ history_page(_Request) :-
             \render_history(Rows)
         ])
     ]).
+
+render_clear_btn(Total) -->
+    { Total > 0 }, !,
+    html(a([href('/clear'), class('btn-danger'),
+            onclick('return confirm("Clear all history?");')], 'Clear All')).
+render_clear_btn(_) --> [].
 
 render_history([]) -->
     html(div([class('empty-state')], [
