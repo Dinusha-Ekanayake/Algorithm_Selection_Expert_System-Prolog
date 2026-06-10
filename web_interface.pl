@@ -1,6 +1,8 @@
 % ============================================================
 %  web_interface.pl
 %  Algorithm Selection Expert System
+%  CM2520 - Deductive Reasoning and Logic Programming
+%  Author: Fernando P S R
 %
 %  Run:  swipl -s web_interface.pl
 %  Open: http://localhost:8080/
@@ -18,6 +20,17 @@
 
 :- dynamic query_log/7.
 :- dynamic custom_algorithm/6.
+
+% These helper predicates span multiple sections of this file.
+:- discontiguous render_cat_cards/3.
+:- discontiguous render_alternative/5.
+:- discontiguous render_comparison_table/5.
+:- discontiguous render_manage_page/2.
+:- discontiguous render_custom_table/3.
+:- discontiguous render_custom_rows/3.
+:- discontiguous render_history/3.
+:- discontiguous history_rows/3.
+:- discontiguous render_clear_btn/3.
 
 
 % ============================================================
