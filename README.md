@@ -1,5 +1,5 @@
 # Algorithm Selection Expert System
-### Prolog-based Web Application | CM2520 - Deductive Reasoning and Logic Programming
+### Prolog-based Web Application
 
 A web-based expert system developed using SWI-Prolog that recommends the most suitable algorithm for a given problem. The system reasons through a Prolog knowledge base using facts, rules, recursion, and dynamic knowledge base management to produce a ranked recommendation with full explanation.
 
