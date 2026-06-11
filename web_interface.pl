@@ -126,7 +126,7 @@ home_page(_Request) :-
         \navbar(home),
         div([class('hero')], [
             h1('Algorithm Selection Expert System'),
-            p([class('subtitle')], 'CM2520 - Deductive Reasoning and Logic Programming'),
+            p([class('subtitle')], 'Prolog Based Application for Algorithm Recommendations'),
             div([class('hero-body')], [
                 p('Describe your problem constraints and let the Prolog expert system reason through the knowledge base to recommend the best algorithm.'),
                 p('The system covers sorting, searching, graph algorithms, dynamic programming, and string matching.'),
